@@ -1,0 +1,22 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { ForgeNav } from "../../components/ForgeNav";
+import { useForge } from "../../components/ForgeProvider";
+import { canUseAdvancedHistory } from "../../lib/plans";
+
+export default function HistoryPage() {
+  const { data, sessions, undoLessonCompletion, subscriptionStatus } = useForge();
+  const [undoMessage, setUndoMessage] = useState("");
+  const advancedHistory = canUseAdvancedHistory(subscriptionStatus);
+  const visibleSessions = advancedHistory ? sessions : sessions.slice(0, 10);
+
+  return <main className="min-h-screen pb-14"><ForgeNav /><div className="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-12"><p className="text-xs font-semibold uppercase tracking-[.18em] text-teal-300">Session history</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">Your focused work, remembered.</h1>{!advancedHistory && sessions.length > visibleSessions.length ? <p className="mt-4 border-l-2 border-teal-400 bg-teal-400/[.07] p-3 text-sm text-teal-100">Showing your 10 most recent sessions. <Link href="/pricing" className="font-bold underline underline-offset-2">FORGE Gold includes deeper progress history.</Link></p> : null}{undoMessage ? <p className="mt-4 border-l-2 border-teal-400 bg-teal-400/[.07] p-3 text-sm text-teal-100" role="status">{undoMessage}</p> : null}{sessions.length ? <div className="mt-8 overflow-hidden rounded-2xl border border-slate-700 bg-[#101c2a]"><div className="hidden grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_.7fr_.7fr] gap-4 border-b border-slate-700 px-5 py-3 text-xs font-semibold uppercase tracking-[.14em] text-slate-500 sm:grid"><span>Lesson</span><span>When</span><span>Focus</span><span>Result</span></div>{visibleSessions.map((session) => {
+    const reward = data.rewardHistory.find((entry) => entry.kind === "completion" && entry.sessionId === session.id);
+    const canUndo = Boolean(reward && !reward.id.startsWith("legacy-completion:"));
+    const statSummary = reward ? Object.entries(reward.statChanges).filter(([, value]) => Number(value) > 0).map(([stat, value]) => `+${value} ${stat}`).join(" · ") : "";
+    const rewardTimestamp = reward && !Number.isNaN(new Date(reward.timestamp).getTime()) ? new Date(reward.timestamp).toLocaleString() : "Saved";
+    return <article key={session.id} className="grid min-w-0 gap-2 border-b border-slate-800 px-5 py-4 last:border-0 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_.7fr_.7fr] sm:gap-4"><div className="min-w-0"><p className="font-medium text-slate-100">{session.questTitle}</p><p className="mt-1 text-xs text-slate-500">{session.campaignTitle}</p></div><p className="text-sm text-slate-400">{Number.isNaN(new Date(session.finishedAt).getTime()) ? "Saved session" : new Date(session.finishedAt).toLocaleString()}</p><p className="text-sm text-teal-300">{session.minutes}m / {session.targetMinutes}m · +{session.xpAwarded} XP</p><div><p className={`text-sm ${session.result === "completed" ? "text-teal-200" : session.result === "abandoned" ? "text-slate-500" : "text-slate-300"}`}>{session.result === "completed" ? "Completed" : session.result === "ended-early" ? "Ended early" : "Abandoned"}</p>{reward ? <p className="mt-1 text-xs text-slate-500">Reward event · {rewardTimestamp}</p> : null}{statSummary ? <p className="mt-1 text-xs text-teal-200">{statSummary}</p> : null}{canUndo && reward ? <button type="button" onClick={() => { if (window.confirm(`Undo ${reward.lessonTitle}? Its exact recorded reward will be reversed. Later lesson rewards will remain unchanged.`) && undoLessonCompletion(reward.lessonId)) setUndoMessage(`Undid ${reward.lessonTitle}. Its recorded reward was reversed; later lesson rewards remain unchanged.`); }} className="mt-2 rounded-md border border-amber-200/25 px-2.5 py-1.5 text-xs font-semibold text-amber-100 hover:border-amber-200/60 focus:outline-none focus:ring-2 focus:ring-amber-200/50">Undo reward</button> : null}</div></article>;
+  })}</div> : <section className="mt-8 border-y border-slate-700 py-8"><h2 className="text-xl font-semibold text-white">No focus sessions yet.</h2><p className="mt-2 max-w-md text-sm leading-6 text-slate-400">Your completed, early-ended, and abandoned sessions will appear here once you begin.</p><Link href="/campaign" className="mt-5 inline-block rounded-lg bg-teal-400 px-4 py-3 text-sm font-bold text-slate-950">Open campaign</Link></section>}</div></main>;
+}
